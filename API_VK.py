@@ -21,15 +21,15 @@ class VK:
         response = requests.get(url, params={**self.params, **params})
         return response.json()['response'][0]
     
-    def get_profile_photo(self):
+    def get_all_photo(self):
         params = self.params
-        params.update({"owner_id": self.id, "album_id": "profile", "extended": 1})
-        response = requests.get(f'{self.API_base_url}photos.get', params=params)
-        return response.json()['response']['items']
+        params.update({"owner_id": self.id, "extended": 1})
+        response = requests.get(f'{self.API_base_url}photos.getAll', params=params)
+        return response.json()
 
 
 if __name__ == "__main__":
-    access_token = config.TOKEN
-    user_id = int(input("Введите ваш user_id ВК"))
+    access_token = config.access_token
+    user_id = 237808807
     vk_client = VK(access_token, user_id)
-    pprint(vk_client.users_info())
+    pprint(vk_client.get_all_photo())
