@@ -12,7 +12,8 @@ class ProgramUser(Base):
 
     user_id = alh.Column(alh.BIGINT, primary_key=True)
     name = alh.Column(alh.String(length=60))
-    last_request = alh.Column(alh.JSON)
+    last_request = alh.Column(alh.JSON) # {}
+    status = alh.Column(alh.Integer)
 
     def __str__(self):
         return f'{self.name}'

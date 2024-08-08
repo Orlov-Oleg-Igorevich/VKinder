@@ -21,21 +21,41 @@ def write_msg(user_id, message, key):
         'random_id': randrange(10 ** 7)
         })
 
-def write_form(user_id, message, key, link='C:/Users/Oleg/Desktop/VKinder/BD_telegram_bot.png', group_id='207439336'):
+def write_form(user_id, message, key, links, group_id='207439336'):
     upload_url = vk.method('photos.getMessagesUploadServer', {
         'group_id': group_id
     })["upload_url"]
-    req = requests.post(upload_url, params={'access_token': config.TOKEN},
-        files={'file':
-               open(link, 'rb')},
-               timeout=10).json()
+    count = 0
+    for num, link in enumerate(links):
+        content = requests.get(link, timeout=10).content
+        with open(f'photo{num}.jpg', 'wb') as f:
+            f.write(content)
+            count += 1
+    if count == 1:
+        req = requests.post(upload_url, params={'access_token': config.TOKEN},
+            files={'file1': open('photo0.jpg', 'rb')},
+                timeout=10).json()
+    elif count == 2:
+        req = requests.post(upload_url, params={'access_token': config.TOKEN},
+            files={'file1': open('photo0.jpg', 'rb'), 'file2': open('photo1.jpg', 'rb')},
+                timeout=10).json()
+    else:
+        req = requests.post(upload_url, params={'access_token': config.TOKEN},
+            files={'file1': open('photo0.jpg', 'rb'), 'file2': open('photo1.jpg', 'rb'), 'file3': open('photo2.jpg', 'rb')},
+                timeout=10).json()
     req.update({'access_token': config.TOKEN, 'v': '5.199'})
+    print(req)
     req = requests.post(VK.API_base_url + 'photos.saveMessagesPhoto', params=req, timeout=10).json()
+    list_ = []
+    for value in req['response']:
+        list_.append(f'photo{value['owner_id']}_{value['id']}')
+    str_ = ','.join(list_)
+    print(len(req['response']))
     vk.method('messages.send', {
         'user_id': user_id,
         'message': message,
         'keyboard': key,
-        'attachment': f'photo{req['response'][0]['owner_id']}_{req['response'][0]['id']}',
+        'attachment': str_,
         'random_id': randrange(10 ** 7)
         })
 
@@ -132,12 +152,16 @@ for event in longpoll.listen():
             elif text_message == "Нравится ❤":
                 pass
             elif text_message == "Дальше":
-                par = {'city': 48, 'sex': 2, 'age_from': 17, 'age_to': 20, 'count': 50, 'fields': ['domain']}
+                par = {'hometown':  'Москва', 'sex': 2, 'age_from': 17, 'age_to': 20, 'count': 50, 'fields': ['domain']}
                 data = get_a_favorite(par)
-                print(data)
                 vk_favorite = VK(config.access_token, data['user_id'])
-                print(vk_favorite.get_all_photo())
-                write_msg(event.user_id, 'fff', keyboard.main_keyboard)
+                photo_album = []
+                for photo in vk_favorite.get_all_photo():
+                    photo_album.append((photo['likes']['count'], photo['orig_photo']['url']))
+                photo_album = sorted(photo_album, key=lambda x: x[0], reverse=True)
+                photo_album = [i[1] for i in photo_album]
+                write_form(event.user_id,
+                        f'{data['first_name']} {data['last_name']}.', keyboard.main_keyboard, photo_album)
             elif text_message == "В чёрный список 🚫":
                 pass
             elif text_message == "В избранное 👀":
