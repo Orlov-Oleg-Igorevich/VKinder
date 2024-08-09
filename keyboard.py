@@ -114,7 +114,7 @@ session_keyboard = {
                 "action": {
                 "type": "text",
                 "payload": "{\"button\": \"2\"}",
-                "label": "Дальше =>"
+                "label": "Дальше 👉"
                 },
                 "color": "primary"
             }

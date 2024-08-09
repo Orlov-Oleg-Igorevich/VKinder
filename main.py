@@ -1,12 +1,16 @@
-from random import randrange
+from random import randrange, randint
 import requests
 import vk_api
 from vk_api.longpoll import VkLongPoll, VkEventType
 import keyboard
+import sqlalchemy
+from sqlalchemy.orm import sessionmaker
 import config
 from API_VK import VK
 import text_answer
 import work_db
+from datetime import date
+import models
 
 
 vk = vk_api.VkApi(token=config.TOKEN)
@@ -44,13 +48,11 @@ def write_form(user_id, message, key, links, group_id='207439336'):
             files={'file1': open('photo0.jpg', 'rb'), 'file2': open('photo1.jpg', 'rb'), 'file3': open('photo2.jpg', 'rb')},
                 timeout=10).json()
     req.update({'access_token': config.TOKEN, 'v': '5.199'})
-    print(req)
     req = requests.post(VK.API_base_url + 'photos.saveMessagesPhoto', params=req, timeout=10).json()
     list_ = []
     for value in req['response']:
         list_.append(f'photo{value['owner_id']}_{value['id']}')
     str_ = ','.join(list_)
-    print(len(req['response']))
     vk.method('messages.send', {
         'user_id': user_id,
         'message': message,
@@ -64,7 +66,7 @@ def get_a_favorite(params):
     params_base = {'access_token': config.access_token, 'v': '5.199'}
     params_base.update(params)
     response = requests.get(url, params=params_base, timeout=10).json()
-    c = 40
+    c = randint(1, 99)
     user_id = response['response']['items'][c]['id']
     first_name = response['response']['items'][c]['first_name']
     last_name = response['response']['items'][c]['last_name']
@@ -77,95 +79,144 @@ def get_last_bot_message(peer_id):
     url = VK.API_base_url + 'messages.getHistory'
     params_base = {'access_token': config.TOKEN, 'v': '5.199', 'peer_id': peer_id}
     response = requests.get(url, params=params_base, timeout=10).json()
-    return response['response']['items'][0]['text']
+    reqv = response['response']['items'][1]
+    name, url_user  = reqv['text'].split('\n')
+    first_name, last_name = name.split(' ')
+    url_user = url_user.strip(' ').split(' ', maxsplit=1)[-1]
+    data_ = {'first_name': first_name, 'last_name': last_name.strip('.'),
+             'link_favorites': url_user}
+    for i, photo_ in enumerate(reqv['attachments']):
+        url = f'{photo_['photo']['owner_id']}_{photo_['photo']['id']}'
+        data_[f'photo{i+1}'] = url
+    return data_
 
-for event in longpoll.listen():
-    if event.type == VkEventType.MESSAGE_NEW:
+def send_carusel(user_id, template):
+    vk.method('messages.send', {
+        'user_id': user_id,
+        'random_id': randrange(10 ** 7),
+        'template': template,
+        'message': 'Ваши фавориты'
+        })
 
-        if event.to_me:
-            #response = work_db.user_authentication(event.user_id)
-            text_message = event.text
-            vk_client = VK(config.access_token, event.user_id)
-            '''if response > 100:
-                if response == 101:
-                    try:
-                        age_left = int(text_message)
-                        if age_left < 10 or age_left > 99:
-                            write_msg(event.user_id, 'Проверьте, пожалуйста, " \
-                                      "корректность данных и введите двухзначное число',
-                                      keyboard.search_keyboard)
+
+if __name__ == "__main__":
+    DSN = 'postgresql://postgres:izvara32@localhost:5432/vkinder'
+    engine = sqlalchemy.create_engine(DSN)
+    #Для создания таблиц базы данных
+    #work_db.create_data_base('postgres', 'postgres', 'izvara32', 'VKinder')
+    models.create_tables(engine)
+
+    Session = sessionmaker(bind=engine)
+    session = Session()
+
+
+    for event in longpoll.listen():
+        if event.type == VkEventType.MESSAGE_NEW:
+
+            if event.to_me:
+                vk_client = VK(config.TOKEN, event.user_id)
+                name = vk_client.users_info('sex')['first_name']
+                data = {'first_name': name}
+                work_db.create_or_change_user(session, event.user_id, data)
+                text_message = event.text
+                if text_message == "Начать":
+                    write_msg(event.user_id,
+                            f"Привет, {name}",
+                            keyboard.main_keyboard)
+
+                elif text_message == "Поиск 👁‍🗨":
+                    city = vk_client.users_info('city')['city']['id']
+                    sex = vk_client.users_info('sex')['sex']
+                    par = {'city': city, 'sex': sex, 'count': 100, 'fields': ['domain'], 'offset': randint(1, 100)}
+                    date_ = vk_client.users_info('bdate').get('bdate')
+                    if date_ and date_.count('.') == 2:
+                        age = int(str(date.today()).split('-', maxsplit=1)[0]) - \
+                            int(vk_client.users_info('bdate')['bdate'].split('.')[2])
+                        par.update({'age_from': age-1,'age_to': age+1})
+                    data = get_a_favorite(par)
+                    while work_db.checking_a_favorite(session, data['user_id']):
+                        data = get_a_favorite(par)
+                    vk_favorite = VK(config.access_token, data['user_id'])
+                    resp = vk_favorite.get_all_photo()
+                    ans = resp.get('response')
+                    while not ans:
+                        data = get_a_favorite(par)
+                        vk_favorite = VK(config.access_token, data['user_id'])
+                        resp = vk_favorite.get_all_photo()
+                        ans = resp.get('response')
+                        print(1)
+                    photo_album = []
+                    for photo in ans['items']:
+                        res = photo.get('orig_photo')
+                        if res:
+                            url = res['url']
                         else:
-                            work_db.send_status_and_json(event.user_id, 102, text_message)
-                            write_msg(event.user_id, 'Введите правую границу возраста для поиска',
-                                    keyboard.search_keyboard)
-                    except ValueError:
-                        write_msg(event.user_id, 'Проверьте, пожалуйста, " \
-                                      "корректность данных и введите двухзначное число',
-                                      keyboard.search_keyboard)
-                elif response == 102:
-                    try:
-                        age_right = int(text_message)
-                        if age_right < 10 or age_left > 99:
-                            write_msg(event.user_id, 'Проверьте, пожалуйста, " \
-                                      "корректность данных и введите двухзначное число',
-                                      keyboard.search_keyboard)
+                            url = photo['sizes'][0]['url']
+                        photo_album.append((photo['likes']['count'], url))
+                    photo_album = sorted(photo_album, key=lambda x: x[0], reverse=True)
+                    photo_album = [i[1] for i in photo_album]
+                    write_form(event.user_id,
+                            f'{data['first_name']} {data['last_name']}.\n\
+                                Ссылка: {data['link']}',
+                            keyboard.session_keyboard, photo_album[:3])
+
+                elif text_message == 'О проекте':
+                    write_msg(event.user_id, text_answer.about, keyboard.main_keyboard)
+
+                elif text_message == "Нравится ❤":
+                    data = get_last_bot_message(event.user_id)
+                    vk_favorite = VK(config.access_token, 1)
+                    nick = data['link_favorites'].split('/')[-1]
+                    favorite_id = vk_favorite.users_get(nick)['id']
+                    work_db.add_favorite(session, event.user_id, favorite_id, data)
+
+                elif text_message == "Дальше 👉":
+                    city = vk_client.users_info('city')['city']['id']
+                    sex = vk_client.users_info('sex')['sex']
+                    par = {'city': city, 'sex': sex, 'count': 100, 'fields': ['domain'], 'offset': randint(1, 100)}
+                    date_ = vk_client.users_info('bdate').get('bdate')
+                    if date_ and date_.count('.') == 2:
+                        age = int(str(date.today()).split('-', maxsplit=1)[0]) - \
+                            int(vk_client.users_info('bdate')['bdate'].split('.')[2])
+                        par.update({'age_from': age-1,'age_to': age+1})
+                    data = get_a_favorite(par)
+                    while work_db.checking_a_favorite(session, data['user_id']):
+                        data = get_a_favorite(par)
+
+                    vk_favorite = VK(config.access_token, data['user_id'])
+                    resp = vk_favorite.get_all_photo()
+                    ans = resp.get('response')
+                    while not ans:
+                        data = get_a_favorite(par)
+                        vk_favorite = VK(config.access_token, data['user_id'])
+                        resp = vk_favorite.get_all_photo()
+                        ans = resp.get('response')
+                        print(1)
+                    photo_album = []
+                    for photo in ans['items']:
+                        res = photo.get('orig_photo')
+                        if res:
+                            url = res['url']
                         else:
-                            work_db.send_status_and_json(event.user_id, 103, text_message)
-                            write_msg(event.user_id, 'Введите город поиска',
-                                    keyboard.search_keyboard)
-                    except ValueError:
-                        write_msg(event.user_id, 'Проверьте, пожалуйста, " \
-                                      "корректность данных и введите двухзначное число',
-                                      keyboard.search_keyboard)
-                elif response == 103:
-                    work_db.send_status_and_json(event.user_id, 104, text_message)
-                    write_msg(event.user_id, 'Введите пол человека', keyboard.search_sex_keyboard)
-                elif response == 104:
-                    work_db.send_status_and_json(event.user_id, 105, text_message)
-                    write_msg(event.user_id, 'Проверьте корректность данных',
-                            keyboard.approval_keyboard)
+                            url = photo['sizes'][0]['url']
+                        photo_album.append((photo['likes']['count'], url))
+                    photo_album = sorted(photo_album, key=lambda x: x[0], reverse=True)
+                    photo_album = [i[1] for i in photo_album]
+                    write_form(event.user_id,
+                            f'{data['first_name']} {data['last_name']}.\n\
+                                Ссылка: {data['link']}',
+                            keyboard.session_keyboard, photo_album[:3])
+
+                elif text_message == "В чёрный список 🚫":
+                    pass
+
+                elif text_message == "В избранное 👀":
+                    data = work_db.get_favorite(session, event.user_id)
+                    ans = []
+                    for i in data:
+                        ans.append(f'{i["first_name"]} {i["last_name"]}: {i["link_favorites"]}')
+                    message = '\n'.join(ans)
+                    write_msg(event.user_id, message, keyboard.session_keyboard)
+
                 else:
-                    if text_message == 'Заполнить запрос заного':
-                        work_db.send_status_and_json(event.user_id, 101, None)
-                        write_msg(event.user_id, 'Введите левую границу возраста для поиска',
-                                keyboard.search_keyboard)
-                    elif text_message == 'Выполнить поиск':
-                        work_db.send_status(event.user_id, 100)
-                        write_form(event.user_id, 'Введите левую границу возраста для поиска',
-                                keyboard.session_keyboard)
-                    else:
-                        write_msg(event.user_id, 'Не удалось распознать команду.\n"\
-                                "Пожалуйста, выберите из предложенных вариантов',
-                                keyboard.approval_keyboard)'''
-
-            if text_message == "Начать":
-                write_msg(event.user_id,
-                        f"Привет, {vk_client.users_info()['first_name']}",
-                        keyboard.main_keyboard)
-            elif text_message == "Поиск 👁‍🗨":
-                work_db.get_status(event.user_id, 101)
-                write_form(event.user_id, 'Введите левую границу возраста для поиска',
-                        keyboard.session_keyboard)
-            elif text_message == 'О проекте':
-                print(get_last_bot_message(event.peer_id))
-                write_msg(event.user_id, text_answer.about, keyboard.main_keyboard)
-            elif text_message == "Нравится ❤":
-                pass
-            elif text_message == "Дальше":
-                par = {'hometown':  'Москва', 'sex': 2, 'age_from': 17, 'age_to': 20, 'count': 50, 'fields': ['domain']}
-                data = get_a_favorite(par)
-                vk_favorite = VK(config.access_token, data['user_id'])
-                photo_album = []
-                for photo in vk_favorite.get_all_photo():
-                    photo_album.append((photo['likes']['count'], photo['orig_photo']['url']))
-                photo_album = sorted(photo_album, key=lambda x: x[0], reverse=True)
-                photo_album = [i[1] for i in photo_album]
-                write_form(event.user_id,
-                        f'{data['first_name']} {data['last_name']}.', keyboard.main_keyboard, photo_album)
-            elif text_message == "В чёрный список 🚫":
-                pass
-            elif text_message == "В избранное 👀":
-                pass
-            else:
-                print(isinstance(get_last_bot_message(event.peer_id), int))
-                write_msg(event.user_id, text_answer.not_found, keyboard.main_keyboard)
+                    write_msg(event.user_id, text_answer.not_found, keyboard.main_keyboard)
