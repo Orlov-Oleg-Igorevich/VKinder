@@ -25,7 +25,7 @@ def write_msg(user_id, message, key):
         'random_id': randrange(10 ** 7)
         })
 
-def write_form(user_id, message, key, links, group_id='207439336'):
+def write_form(user_id, message, key, links, group_id):
     upload_url = vk.method('photos.getMessagesUploadServer', {
         'group_id': group_id
     })["upload_url"]
@@ -90,20 +90,12 @@ def get_last_bot_message(peer_id):
         data_[f'photo{i+1}'] = url
     return data_
 
-def send_carusel(user_id, template):
-    vk.method('messages.send', {
-        'user_id': user_id,
-        'random_id': randrange(10 ** 7),
-        'template': template,
-        'message': 'Ваши фавориты'
-        })
-
 
 if __name__ == "__main__":
-    DSN = 'postgresql://postgres:izvara32@localhost:5432/vkinder'
+    DSN = f'{config.DBMS}://{config.USER}:{config.PASSWORD}@{config.HOST}/{config.DB_NAME}'
     engine = sqlalchemy.create_engine(DSN)
     #Для создания таблиц базы данных
-    #work_db.create_data_base('postgres', 'postgres', 'izvara32', 'VKinder')
+    #work_db.create_data_base(config.DBMS, config.USER, config.PASSWORD, config.DB_NAME)
     models.create_tables(engine)
 
     Session = sessionmaker(bind=engine)
@@ -127,6 +119,10 @@ if __name__ == "__main__":
                 elif text_message == "Поиск 👁‍🗨":
                     city = vk_client.users_info('city')['city']['id']
                     sex = vk_client.users_info('sex')['sex']
+                    if sex == 2:
+                        sex = 1
+                    elif sex == 1:
+                        sex = 2
                     par = {'city': city, 'sex': sex, 'count': 100, 'fields': ['domain'], 'offset': randint(1, 100)}
                     date_ = vk_client.users_info('bdate').get('bdate')
                     if date_ and date_.count('.') == 2:
@@ -144,7 +140,6 @@ if __name__ == "__main__":
                         vk_favorite = VK(config.access_token, data['user_id'])
                         resp = vk_favorite.get_all_photo()
                         ans = resp.get('response')
-                        print(1)
                     photo_album = []
                     for photo in ans['items']:
                         res = photo.get('orig_photo')
@@ -158,7 +153,7 @@ if __name__ == "__main__":
                     write_form(event.user_id,
                             f'{data['first_name']} {data['last_name']}.\n\
                                 Ссылка: {data['link']}',
-                            keyboard.session_keyboard, photo_album[:3])
+                            keyboard.session_keyboard, photo_album[:3], longpoll.group_id)
 
                 elif text_message == 'О проекте':
                     write_msg(event.user_id, text_answer.about, keyboard.main_keyboard)
@@ -173,6 +168,10 @@ if __name__ == "__main__":
                 elif text_message == "Дальше 👉":
                     city = vk_client.users_info('city')['city']['id']
                     sex = vk_client.users_info('sex')['sex']
+                    if sex == 2:
+                        sex = 1
+                    elif sex == 1:
+                        sex = 2
                     par = {'city': city, 'sex': sex, 'count': 100, 'fields': ['domain'], 'offset': randint(1, 100)}
                     date_ = vk_client.users_info('bdate').get('bdate')
                     if date_ and date_.count('.') == 2:
@@ -205,7 +204,7 @@ if __name__ == "__main__":
                     write_form(event.user_id,
                             f'{data['first_name']} {data['last_name']}.\n\
                                 Ссылка: {data['link']}',
-                            keyboard.session_keyboard, photo_album[:3])
+                            keyboard.session_keyboard, photo_album[:3], longpoll.group_id)
 
                 elif text_message == "В чёрный список 🚫":
                     pass

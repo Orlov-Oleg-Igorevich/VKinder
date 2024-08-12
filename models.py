@@ -25,27 +25,13 @@ class ListOfFavorites(Base):
     first_name = alh.Column(alh.String(length=60))
     last_name = alh.Column(alh.String(length=60))
     link_favorites = alh.Column(alh.String(length=150))
-    photo1 = alh.Column(alh.String(length=300))
-    photo2 = alh.Column(alh.String(length=300))
-    photo3 = alh.Column(alh.String(length=300))
+    photo1 = alh.Column(alh.String(length=100))
+    photo2 = alh.Column(alh.String(length=100))
+    photo3 = alh.Column(alh.String(length=100))
 
     def __str__(self):
         return f'{self.name} {self.gender}.\
         Возраст: {self.age}. Город: {self.city}. Профиль: {self.link_favorites}'
-
-
-"""class FavoritesPhoto(Base):
-    '''Модель фото фаворита'''
-    __tablename__ = "favorites_photo"
-
-    photo_id = alh.Column(alh.Integer, primary_key=True)
-    title = alh.Column(alh.String(length=60))
-    count_like = alh.Column(alh.Integer())
-    link = alh.Column(alh.String(length=150))
-    favorites_id = alh.Column(alh.Integer, ForeignKey('favorites.favorites_id', ondelete='CASCADE'))
-
-    def __str__(self):
-        return f'{self.title} {self.count_like} {self.link}' """
 
 
 class BridgeUserFavorites(Base):

@@ -5,14 +5,6 @@ from sqlalchemy.orm import sessionmaker
 
 import models as md
 
-'''Коды ответа дял авторизации:
-200 - клиент на стартовой страницы. Клавиатура - main
-100 - клиент в режиме просмотра анкет. Клавиатура - session
-101 - ожидание от клиента левой границы возраста. Клавиатура - search
-102 - ожидание правой границы возраста. Клавиатура - search
-103 - ожидание города. Клавиатура - search
-104 - ожидание пола. Клавиатура - search_sex
-105 - подтверждение поиска'''
 
 #Создание самой Базы Данных
 def create_data_base(name_postgres_base, user_postgres, password_postgres, name_DB):
@@ -25,8 +17,6 @@ def create_data_base(name_postgres_base, user_postgres, password_postgres, name_
     print(f'Ваша база данных {name_DB} создана')
     cur.close()
     conn.close()
-
-#create_data_base('postgres', 'postgres', '', 'VKinder')
 
 
 def create_or_change_user(session, user_id, data):
