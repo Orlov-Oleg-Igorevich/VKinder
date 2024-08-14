@@ -37,16 +37,18 @@ def get_favorite(session, user_id):
     responses = session.query(md.ListOfFavorites).join(md.BridgeUserFavorites,
         md.BridgeUserFavorites.favorites_id == md.ListOfFavorites.favorites_id
     ).filter(md.BridgeUserFavorites.program_user_id == user_id).all()
-    data = []
-    for response in responses:
-        data.append({
-    'first_name': response.first_name,
-    'last_name': response.last_name,
-    'link_favorites': response.link_favorites,
-    'photo1': response.photo1,
-    'photo2': response.photo2,
-    'photo3': response.photo3})
-    return data
+    if responses:
+        data = []
+        for response in responses:
+            data.append({
+        'first_name': response.first_name,
+        'last_name': response.last_name,
+        'link_favorites': response.link_favorites,
+        'photo1': response.photo1,
+        'photo2': response.photo2,
+        'photo3': response.photo3})
+        return data
+    return None
 
 
 

@@ -211,11 +211,14 @@ if __name__ == "__main__":
 
                 elif text_message == "В избранное 👀":
                     data = work_db.get_favorite(session, event.user_id)
-                    ans = []
-                    for i in data:
-                        ans.append(f'{i["first_name"]} {i["last_name"]}: {i["link_favorites"]}')
-                    message = '\n'.join(ans)
-                    write_msg(event.user_id, message, keyboard.session_keyboard)
+                    if data is None:
+                        write_msg(event.user_id, 'Вы пока не лайкнули ни одного человека', keyboard.session_keyboard)
+                    else:
+                        ans = []
+                        for i in data:
+                            ans.append(f'{i["first_name"]} {i["last_name"]}: {i["link_favorites"]}')
+                        message = '\n'.join(ans)
+                        write_msg(event.user_id, message, keyboard.session_keyboard)
 
                 else:
                     write_msg(event.user_id, text_answer.not_found, keyboard.main_keyboard)
